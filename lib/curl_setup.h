@@ -77,6 +77,8 @@
 
 #else /* HAVE_CONFIG_H */
 
+#define CURL_DISABLE_LDAP 1
+
 #ifdef _WIN32_WCE
 #  include "config-win32ce.h"
 #else
