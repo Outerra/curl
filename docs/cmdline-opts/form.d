@@ -3,7 +3,8 @@ Short: F
 Arg: <name=content>
 Help: Specify multipart MIME data
 Protocols: HTTP SMTP IMAP
-Mutexed: data head upload
+Mutexed: data head upload-file
+Category: http upload
 ---
 For HTTP protocol family, this lets curl emulate a filled-in form in which a
 user has pressed the submit button. This causes curl to POST data using the
@@ -12,22 +13,35 @@ Content-Type multipart/form-data according to RFC 2388.
 For SMTP and IMAP protocols, this is the mean to compose a multipart mail
 message to transmit.
 
-This enables uploading of binary
-files etc. To force the 'content' part to be a file, prefix the file name with
-an @ sign. To just get the content part from a file, prefix the file name with
-the symbol <. The difference between @ and < is then that @ makes a file get
-attached in the post as a file upload, while the < makes a text field and just
-get the contents for that text field from a file.
+This enables uploading of binary files etc. To force the 'content' part to be
+a file, prefix the file name with an @ sign. To just get the content part from
+a file, prefix the file name with the symbol <. The difference between @ and <
+is then that @ makes a file get attached in the post as a file upload, while
+the < makes a text field and just get the contents for that text field from a
+file.
 
-Example: to send an image to an HTTP server, where \&'profile' is the name of
-the form-field to which portrait.jpg will be the input:
+Tell curl to read content from stdin instead of a file by using - as
+filename. This goes for both @ and < constructs. When stdin is used, the
+contents is buffered in memory first by curl to determine its size and allow a
+possible resend.  Defining a part's data from a named non-regular file (such
+as a named pipe or similar) is unfortunately not subject to buffering and will
+be effectively read at transmission time; since the full size is unknown
+before the transfer starts, such data is sent as chunks by HTTP and rejected
+by IMAP.
+
+Example: send an image to an HTTP server, where \&'profile' is the name of the
+form-field to which the file portrait.jpg will be the input:
 
  curl -F profile=@portrait.jpg https://example.com/upload.cgi
 
-To read content from stdin instead of a file, use - as the filename. This goes
-for both @ and < constructs. Unfortunately it does not support reading the
-file from a named pipe or similar, as it needs the full size before the
-transfer starts.
+Example: send your name and shoe size in two text fields to the server:
+
+ curl -F name=John -F shoesize=11 https://example.com/
+
+Example: send your essay in a text field to the server. Send it as a plain
+text field, but get the contents for it from a local file:
+
+ curl -F "story=<hugefile.txt" https://example.com/
 
 You can also tell curl what Content-Type to use by using 'type=', in a manner
 similar to:
@@ -53,6 +67,11 @@ or
 
 Note that if a filename/path is quoted by double-quotes, any double-quote
 or backslash within the filename must be escaped by backslash.
+
+Quoting must also be applied to non-file data if it contains semicolons,
+leading/trailing spaces or leading double quotes:
+
+ curl -F 'colors="red; green; blue";type=text/x-myapp' example.com
 
 You can add custom headers to the field by setting headers=, like
 
@@ -102,11 +121,11 @@ text file:
       -F '=)' -F '=@textfile.txt' ...  smtp://example.com
 
 Data can be encoded for transfer using encoder=. Available encodings are
-\fIbinary\fP and \fI8bit\fP that do nothing else than adding the corresponding
-Content-Transfer-Encoding header, \fI7bit\fP that only rejects 8-bit characters
-with a transfer error, \fIquoted-printable\fP and \fIbase64\fP that encodes
-data according to the corresponding schemes, limiting lines length to
-76 characters.
+*binary* and *8bit* that do nothing else than adding the corresponding
+Content-Transfer-Encoding header, *7bit* that only rejects 8-bit characters
+with a transfer error, *quoted-printable* and *base64* that encodes data
+according to the corresponding schemes, limiting lines length to 76
+characters.
 
 Example: send multipart mail with a quoted-printable text message and a
 base64 attached file:

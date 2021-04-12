@@ -5,11 +5,11 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2017, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) 1998 - 2020, Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
- * are also available at https://curl.haxx.se/docs/copyright.html.
+ * are also available at https://curl.se/docs/copyright.html.
  *
  * You may opt to use, copy, modify, merge, publish, distribute and/or sell
  * copies of the Software, and permit persons to whom the Software is
@@ -50,7 +50,7 @@ UNITTEST_START
   size_t i;
 
   for(i = 0; i < sizeof(tests)/sizeof(tests[0]); i++) {
-    time_t result = curlx_tvdiff(tests[i].first, tests[i].second);
+    timediff_t result = Curl_timediff(tests[i].first, tests[i].second);
     if(result != tests[i].result) {
       printf("%d.%06u to %d.%06u got %d, but expected %d\n",
              tests[i].first.tv_sec,

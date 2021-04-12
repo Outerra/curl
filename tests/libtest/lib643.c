@@ -5,11 +5,11 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2017, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) 1998 - 2020, Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
- * are also available at https://curl.haxx.se/docs/copyright.html.
+ * are also available at https://curl.se/docs/copyright.html.
  *
  * You may opt to use, copy, modify, merge, publish, distribute and/or sell
  * copies of the Software, and permit persons to whom the Software is
@@ -26,26 +26,33 @@
 static char data[]=
 #ifdef CURL_DOES_CONVERSIONS
   /* ASCII representation with escape sequences for non-ASCII platforms */
-  "\x74\x68\x69\x73\x20\x69\x73\x20\x77\x68\x61\x74\x20\x77\x65\x20\x70"
-  "\x6f\x73\x74\x20\x74\x6f\x20\x74\x68\x65\x20\x73\x69\x6c\x6c\x79\x20"
-  "\x77\x65\x62\x20\x73\x65\x72\x76\x65\x72\x0a";
+  "\x64\x75\x6d\x6d\x79\x0a";
 #else
-  "this is what we post to the silly web server\n";
+  "dummy\n";
 #endif
 
 struct WriteThis {
   char *readptr;
-  size_t sizeleft;
+  curl_off_t sizeleft;
 };
 
 static size_t read_callback(char *ptr, size_t size, size_t nmemb, void *userp)
 {
 #ifdef LIB644
+  static int count = 0;
   (void)ptr;
   (void)size;
   (void)nmemb;
   (void)userp;
-  return CURL_READFUNC_ABORT;
+  switch(count++) {
+  case 0: /* Return a single byte. */
+    *ptr = '\n';
+    return 1;
+  case 1: /* Request abort. */
+    return CURL_READFUNC_ABORT;
+  }
+  printf("Wrongly called >2 times\n");
+  exit(1); /* trigger major failure */
 #else
 
   struct WriteThis *pooh = (struct WriteThis *)userp;
@@ -55,7 +62,7 @@ static size_t read_callback(char *ptr, size_t size, size_t nmemb, void *userp)
     return 0;
 
 #ifndef LIB645
-  eof = !pooh->sizeleft;
+  eof = pooh->sizeleft <= 0;
   if(!eof)
     pooh->sizeleft--;
 #endif
@@ -83,7 +90,7 @@ static int once(char *URL, bool oldstyle)
 
   pooh.readptr = data;
 #ifndef LIB645
-  datasize = strlen(data);
+  datasize = (curl_off_t)strlen(data);
 #endif
   pooh.sizeleft = datasize;
 
@@ -138,7 +145,7 @@ static int once(char *URL, bool oldstyle)
 
   pooh2.readptr = data;
 #ifndef LIB645
-  datasize = strlen(data);
+  datasize = (curl_off_t)strlen(data);
 #endif
   pooh2.sizeleft = datasize;
 
@@ -251,6 +258,30 @@ test_cleanup:
   return res;
 }
 
+static int cyclic_add(void)
+{
+  CURL *easy = curl_easy_init();
+  curl_mime *mime = curl_mime_init(easy);
+  curl_mimepart *part = curl_mime_addpart(mime);
+  CURLcode a1 = curl_mime_subparts(part, mime);
+
+  if(a1 == CURLE_BAD_FUNCTION_ARGUMENT) {
+    curl_mime *submime = curl_mime_init(easy);
+    curl_mimepart *subpart = curl_mime_addpart(submime);
+
+    curl_mime_subparts(part, submime);
+    a1 = curl_mime_subparts(subpart, mime);
+  }
+
+  curl_mime_free(mime);
+  curl_easy_cleanup(easy);
+  if(a1 != CURLE_BAD_FUNCTION_ARGUMENT)
+    /* that should have failed */
+    return 1;
+
+  return 0;
+}
+
 int test(char *URL)
 {
   int res;
@@ -263,6 +294,9 @@ int test(char *URL)
   res = once(URL, TRUE); /* old */
   if(!res)
     res = once(URL, FALSE); /* new */
+
+  if(!res)
+    res = cyclic_add();
 
   curl_global_cleanup();
 
